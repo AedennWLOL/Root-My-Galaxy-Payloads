@@ -24,12 +24,23 @@ between KMIs.
 | `ksud-e1s-S921BXXSFDZE1-kdp` | Same exact E1S build | `android14-6.1` | Device-tested late-load binary embedding the E1S no-patch-text module |
 | `android14-6.1_kernelsu-samsung-kdp.ko` | `SM-S721N` `S721NKSSCDZF3`; `SM-S921B` `S921BXXSFDZF2` | `android14-6.1` | Standalone Samsung KDP/RKP/DEFEX module with target `vermagic` |
 | `ksud-samsung-android14-6.1-kdp` | Same verified 6.1 targets | `android14-6.1` | Late-load binary embedding the 6.1 module |
+| `android14-6.1_kernelsu-s25fe-S731USQS8BZF5-kdp.ko` | `SM-S731U` `S731USQS8BZF5` | `android14-6.1` | Same 6.1 no-patch-text module (E2S source) re-audited against the recovered S731U `vmlinux.elf` |
+| `ksud-s25fe-S731USQS8BZF5-kdp` | `SM-S731U` `S731USQS8BZF5` | `android14-6.1` | Late-load binary embedding the re-audited 6.1 no-patch-text module |
 | `android12-5.10_kernelsu-samsung-kdp.ko` | `SM-A155N` `A155NKSS6BYH1` | `android12-5.10` | Standalone Samsung KDP/RKP/DEFEX module built against the exact A15 kernel |
 | `ksud-samsung-android12-5.10-kdp` | `SM-A155N` `A155NKSS6BYH1` | `android12-5.10` | Late-load binary embedding the 5.10 module |
 
 The standalone `.ko` files are retained for auditing. Root My Galaxy downloads
 the corresponding `ksud-*` file because `ksud late-load` loads its embedded
 `<kmi>_kernelsu.ko` asset.
+
+The S25 FE (`SM-S731U`, `S731USQS8BZF5`) is an Exynos 2400e device, so it uses
+the Samsung no-patch-text source (same as the E2S build) rather than the
+generic 6.1 module, which panics in Exynos EL2 while attempting live text
+patching. `tools/audit_module_against_target.py --manual-relocation` reports 202
+undefined imports, zero missing from the recovered S731U target symbol table,
+zero `__versions` entries, and zero target CRC mismatches. Statically audited
+but device-untested on this exact release; validate on hardware before
+deployment.
 
 The generic 6.1 files and E3Q pair are build-verified but device-untested. The
 E3Q pair is tied to the full S928U DZF2 release string and must not be replaced

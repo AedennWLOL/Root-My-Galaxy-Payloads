@@ -1,4 +1,4 @@
-﻿#ifndef OFFSET_H
+#ifndef OFFSET_H
 #define OFFSET_H
 
 #if defined(APP_PAYLOAD) && APP_PAYLOAD

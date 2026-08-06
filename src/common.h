@@ -257,6 +257,7 @@ extern ssize_t cfi_read_ret;
 extern ssize_t cfi_read_slot_ret;
 extern ssize_t cfi_owner_ret;
 extern ssize_t cfi_restore_ret;
+extern int cfi_restore_verified;
 extern uint64_t fops_before;
 extern uint64_t fops_after;
 extern int root_child_done;

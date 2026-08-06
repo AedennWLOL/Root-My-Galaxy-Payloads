@@ -248,11 +248,7 @@ static void *__mm_leak(void *arg)
                 } else {
                     // need to set the tag if mte is enabled
                     for (size_t tag_candidate = 0;
-#if defined(APP_REQUIRE_FRESH_P0_SESSION) && APP_REQUIRE_FRESH_P0_SESSION
                          tag_candidate < 16 && !ks->found;
-#else
-                         tag_candidate < 15 && !ks->found;
-#endif
                          ++tag_candidate) {
                         size_t __mm_struct_candidate = mm_struct_candidate & ~(0xfULL << 56);
                         __mm_struct_candidate |= (tag_candidate << 56);

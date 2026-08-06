@@ -326,7 +326,6 @@ void run_kernelsnitch_bruteforce(void) {
   kernelsnitch_bruteforce(ks);
 }
 
-#if defined(APP_REQUIRE_FRESH_P0_SESSION) && APP_REQUIRE_FRESH_P0_SESSION
 static uintptr_t canonicalize_kernelsnitch_pointer(uintptr_t leaked) {
 #if KERNELSNITCH_MTE_ENABLED
   if (leaked != (uintptr_t)-1) {
@@ -338,16 +337,11 @@ static uintptr_t canonicalize_kernelsnitch_pointer(uintptr_t leaked) {
 #endif
   return leaked;
 }
-#endif
 
 uintptr_t cleanup_kernelsnitch(void) {
   uintptr_t leaked = kernelsnitch_cleanup(ks);
   ks = NULL;
-#if defined(APP_REQUIRE_FRESH_P0_SESSION) && APP_REQUIRE_FRESH_P0_SESSION
   return canonicalize_kernelsnitch_pointer(leaked);
-#else
-  return leaked;
-#endif
 }
 
 void read_first_line(const char *path, char *buf, size_t len) {
